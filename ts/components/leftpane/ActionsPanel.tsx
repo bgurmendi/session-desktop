@@ -68,6 +68,7 @@ import { KbdShortcut } from '../../util/keyboardShortcuts';
 import { useNewConversationCallback } from '../buttons/MenuButton';
 import { useFocusScope } from '../../state/focus';
 import { useOverlayChooseAction } from '../../hooks/useOverlayChooseAction';
+import { useContactLinkListener } from '../../hooks/useContactLinkListener';
 import { Flex } from '../basic/Flex';
 import { FlexSpacer } from '../basic/Text';
 import { focusVisibleOutline } from '../../styles/focusVisible';
@@ -299,6 +300,7 @@ export const ActionsPanel = () => {
   useKeyboardShortcutsModalKeyboardShortcut();
   useUserSettingsModalKeyboardShortcut();
   useNewConversationKeyboardShortcut();
+  useContactLinkListener();
 
   useInterval(() => {
     if (!ourPrimaryConversation) {

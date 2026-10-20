@@ -226,6 +226,14 @@
   },
   "build": {
     "appId": "com.loki-project.messenger-desktop",
+    "protocols": [
+      {
+        "name": "Session contact link",
+        "schemes": [
+          "sessionmessenger"
+        ]
+      }
+    ],
     "afterSign": "build/notarize.js",
     "afterPack": "build/afterPackHook.js",
     "artifactName": "${name}-${os}-${arch}-${version}.${ext}",

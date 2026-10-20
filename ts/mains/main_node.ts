@@ -134,6 +134,42 @@ function showWindow() {
   }
 }
 
+/**
+ * Contact link (`sessionmessenger://add#<accountId>`) received from the OS, waiting for the renderer to take it.
+ * The renderer asks for it when it is ready (`take-pending-contact-link`), and is told about new ones with `contact-link-available`.
+ */
+let pendingContactLinkAccountId: string | null = null;
+
+function onContactLinkReceived(accountId: string | null) {
+  if (!accountId) {
+    return;
+  }
+  pendingContactLinkAccountId = accountId;
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    showWindow();
+    mainWindow.webContents.send('contact-link-available');
+  }
+}
+
+// Windows & Linux: the link is given as a command line argument when we are launched by it.
+// This needs to be done before `ready` as the renderer asks for it once it is ready.
+pendingContactLinkAccountId = getContactLinkAccountIdFromArgv(process.argv);
+
+// macOS: the link is given with the `open-url` event (it can be fired before `ready`).
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  onContactLinkReceived(parseContactLink(url));
+});
+
+ipcMain.handle('take-pending-contact-link', () => {
+  const accountId = pendingContactLinkAccountId;
+  pendingContactLinkAccountId = null;
+  return accountId;
+});
+
 if (!process.mas) {
   console.log('making app single instance');
   const gotLock = app.requestSingleInstanceLock();
@@ -144,7 +180,10 @@ if (!process.mas) {
       app.exit();
     }
   } else {
-    app.on('second-instance', () => {
+    app.on('second-instance', (_event, argv) => {
+      // Windows & Linux: opening a contact link while we are running starts a second instance with the link as argument
+      onContactLinkReceived(getContactLinkAccountIdFromArgv(argv));
+
       // Someone tried to run a second instance, we should focus our window
       if (mainWindow) {
         if (mainWindow.isMinimized()) {
@@ -186,6 +225,11 @@ const windowFromEphemeral = ephemeralConfig.get('window');
 let windowConfig = windowFromEphemeral;
 
 import { readFile } from 'fs-extra';
+import {
+  CONTACT_LINK_SCHEME,
+  getContactLinkAccountIdFromArgv,
+  parseContactLink,
+} from '../util/contactLink';
 import { getAppRootPath } from '../node/getRootPath';
 import { setLatestRelease } from '../node/latest_desktop_release';
 import { isDevProd, isTestIntegration } from '../shared/env_vars';
@@ -761,6 +805,12 @@ async function saveDebugLog(_event: any) {
 // Some APIs can only be used after this event occurs.
 let ready = false;
 app.on('ready', async () => {
+  // Registers this app as the handler of `sessionmessenger://` links. Dev builds are not registered
+  // as that would hijack the links from an installed Session.
+  if (app.isPackaged && appInstance === 0) {
+    app.setAsDefaultProtocolClient(CONTACT_LINK_SCHEME);
+  }
+
   const userDataPath = getRealPath(app.getPath('userData'));
   const installPath = getRealPath(join(app.getAppPath(), '..', '..'));
 
